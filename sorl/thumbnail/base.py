@@ -73,19 +73,7 @@ class Thumbnail(object):
         if not self.dest:
             raise ThumbnailException("No destination filename set.")
 
-        if not isinstance(self.dest, basestring):
-            # We'll assume dest is a file-like instance if it exists but isn't
-            # a string.
-            self._do_generate()
-        elif not isfile(self.dest) or (self.source_exists and
-            getmtime(self.source) > getmtime(self.dest)):
-
-            # Ensure the directory exists
-            directory = dirname(self.dest)
-            if directory and not isdir(directory):
-                os.makedirs(directory)
-
-            self._do_generate()
+        self._do_generate()
 
     def _check_source_exists(self):
         """
@@ -239,6 +227,11 @@ class Thumbnail(object):
             try:
                 im.save(self.dest, format=format, quality=self.quality,
                         optimize=1)
+            except KeyError:
+                try:
+                    im.save(self.dest, format="JPEG", quality=self.quality)
+                except IOError, detail:
+                    raise ThumbnailException(detail)
             except IOError:
                 # Try again, without optimization (PIL can't optimize an image
                 # larger than ImageFile.MAXBLOCK, which is 64k by default)

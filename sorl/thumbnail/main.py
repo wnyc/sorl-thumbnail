@@ -2,11 +2,11 @@ import os
 
 from django.conf import settings
 from django.utils.encoding import iri_to_uri, force_unicode
-
+from django.core.files.storage import DefaultStorage
 from sorl.thumbnail.base import Thumbnail
 from sorl.thumbnail.processors import dynamic_import
 from sorl.thumbnail import defaults
-
+from tempfile import NamedTemporaryFile
 
 def get_thumbnail_setting(setting, override=None):
     """
@@ -57,45 +57,42 @@ class DjangoThumbnail(Thumbnail):
 
     def __init__(self, relative_source, requested_size, opts=None,
                  quality=None, basedir=None, subdir=None, prefix=None,
-                 relative_dest=None, processors=None, extension=None):
+                 relative_dest=None, processors=None, extension=None, storage_server=None):
+        if not storage_server:
+            storage_server = DefaultStorage()
         relative_source = force_unicode(relative_source)
         # Set the absolute filename for the source file
-        source = self._absolute_path(relative_source)
+        with self._get_data_as_tempfile(relative_source, storage_server) as source:
 
-        quality = get_thumbnail_setting('QUALITY', quality)
-        convert_path = get_thumbnail_setting('CONVERT')
-        wvps_path = get_thumbnail_setting('WVPS')
-        if processors is None:
-            processors = dynamic_import(get_thumbnail_setting('PROCESSORS'))
+            quality = get_thumbnail_setting('QUALITY', quality)
+            convert_path = get_thumbnail_setting('CONVERT')
+            wvps_path = get_thumbnail_setting('WVPS')
+            if processors is None:
+                processors = dynamic_import(get_thumbnail_setting('PROCESSORS'))
 
-        # Call super().__init__ now to set the opts attribute. generate() won't
-        # get called because we are not setting the dest attribute yet.
-        super(DjangoThumbnail, self).__init__(source, requested_size,
-            opts=opts, quality=quality, convert_path=convert_path,
-            wvps_path=wvps_path, processors=processors)
+            # Call super().__init__ now to set the opts attribute. generate() won't
+            # get called because we are not setting the dest attribute yet.
+            super(DjangoThumbnail, self).__init__(source, requested_size,
+                opts=opts, quality=quality, convert_path=convert_path,
+                wvps_path=wvps_path, processors=processors)
 
-        # Get the relative filename for the thumbnail image, then set the
-        # destination filename
-        if relative_dest is None:
-            relative_dest = \
-               self._get_relative_thumbnail(relative_source, basedir=basedir,
-                                            subdir=subdir, prefix=prefix,
-                                            extension=extension)
-        filelike = not isinstance(relative_dest, basestring)
-        if filelike:
-            self.dest = relative_dest
-        else:
-            self.dest = self._absolute_path(relative_dest)
+            # Get the relative filename for the thumbnail image, then set the
+            # destination filename
+            if relative_dest is None:
+                relative_dest = \
+                   self._get_relative_thumbnail(relative_source.name, basedir=basedir,
+                                                subdir=subdir, prefix=prefix,
+                                                extension=extension)
+            
+            with NamedTemporaryFile() as dest:
+                self.dest = dest.name
+                
+                self.generate()
+                dest.seek(0)
+                data = dest.read()
+                self.relative_url = storage_server.save(relative_dest, data)
+                self.absolute_url = os.path.join(settings.MEDIA_URL, self.relative_url)
 
-        # Call generate now that the dest attribute has been set
-        self.generate()
-
-        # Set the relative & absolute url to the thumbnail
-        if not filelike:
-            self.relative_url = \
-                iri_to_uri('/'.join(relative_dest.split(os.sep)))
-            self.absolute_url = '%s%s' % (settings.MEDIA_URL,
-                                          self.relative_url)
 
     def _get_relative_thumbnail(self, relative_source,
                                 basedir=None, subdir=None, prefix=None,
@@ -107,9 +104,14 @@ class DjangoThumbnail(Thumbnail):
                                     self.opts, self.quality, basedir, subdir,
                                     prefix, extension)
 
-    def _absolute_path(self, filename):
-        absolute_filename = os.path.join(settings.MEDIA_ROOT, filename)
-        return absolute_filename.encode(settings.FILE_CHARSET)
+    # Was _absolute_path
+    def _get_data_as_tempfile(self, filename, storage_server):
+        data = storage_server.open(filename).read()
+        f = NamedTemporaryFile()
+        f.write(data)
+        f.seek(0)
+        return f 
+
 
     def __unicode__(self):
         return self.absolute_url
