@@ -6,6 +6,7 @@ from django.core.files.storage import DefaultStorage
 from sorl.thumbnail.base import Thumbnail
 from sorl.thumbnail.processors import dynamic_import
 from sorl.thumbnail import defaults
+from StringIO import StringIO 
 from tempfile import NamedTemporaryFile
 
 def get_thumbnail_setting(setting, override=None):
@@ -90,7 +91,7 @@ class DjangoThumbnail(Thumbnail):
                 self.generate()
                 dest.seek(0)
                 data = dest.read()
-                self.relative_url = storage_server.save(relative_dest, data)
+                self.relative_url = storage_server.save(relative_dest, StringIO(data))
                 self.absolute_url = os.path.join(settings.MEDIA_URL, self.relative_url)
 
 

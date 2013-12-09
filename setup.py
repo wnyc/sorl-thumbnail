@@ -12,7 +12,7 @@ finally:
 
  
 setup(
-    name='sorl-thumbnail',
+    name='wnyc-sorl-thumbnail',
     version=VERSION,
     url='http://code.google.com/p/sorl-thumbnail/',
     download_url='http://sorl-thumbnail.googlecode.com/files/sorl-thumbnail-'
