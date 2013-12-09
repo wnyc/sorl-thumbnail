@@ -3,6 +3,7 @@ import os
 from django.conf import settings
 from django.utils.encoding import iri_to_uri, force_unicode
 from django.core.files.storage import DefaultStorage
+from django.core.files import File
 from sorl.thumbnail.base import Thumbnail
 from sorl.thumbnail.processors import dynamic_import
 from sorl.thumbnail import defaults
@@ -91,7 +92,7 @@ class DjangoThumbnail(Thumbnail):
                 self.generate()
                 dest.seek(0)
                 data = dest.read()
-                self.relative_url = storage_server.save(relative_dest, StringIO(data))
+                self.relative_url = storage_server.save(relative_dest, File(StringIO(data)))
                 self.absolute_url = os.path.join(settings.MEDIA_URL, self.relative_url)
 
 
