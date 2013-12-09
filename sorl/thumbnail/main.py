@@ -92,8 +92,9 @@ class DjangoThumbnail(Thumbnail):
                 self.generate()
                 dest.seek(0)
                 data = dest.read()
-                f = StriongIO(data)
+                f = StringIO(data)
                 f.name = relative_dest
+                f.size = len(data)
                 self.relative_url = storage_server.save(relative_dest, File(f))
                 self.absolute_url = os.path.join(settings.MEDIA_URL, self.relative_url)
 
