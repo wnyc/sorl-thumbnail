@@ -1,14 +1,18 @@
 import os
 
 from django.conf import settings
+from django.core.cache import get_cache
 from django.utils.encoding import iri_to_uri, force_unicode
 from django.core.files.storage import DefaultStorage
 from django.core.files import File
+from hashlib import md5 
 from sorl.thumbnail.base import Thumbnail
 from sorl.thumbnail.processors import dynamic_import
 from sorl.thumbnail import defaults
 from StringIO import StringIO 
 from tempfile import NamedTemporaryFile
+
+cache = get_cache('default')
 
 def get_thumbnail_setting(setting, override=None):
     """
@@ -111,7 +115,11 @@ class DjangoThumbnail(Thumbnail):
 
     # Was _absolute_path
     def _get_data_as_tempfile(self, filename, storage_server):
-        data = storage_server.open(filename).read()
+        key = 'sorl:' + md5(filename).hexdigest()
+        data = cache.get(key)
+        if data is None:
+            data = storage_server.open(filename).read()
+            cache.set(key, data)
         f = NamedTemporaryFile()
         f.write(data)
         f.seek(0)
